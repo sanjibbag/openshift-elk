@@ -1,0 +1,298 @@
+{
+    "kind": "Template",
+    "apiVersion": "v1",
+    "metadata": {
+        "name": "cloud-log",
+        "namespace": "openshift",
+        "annotations": {
+            "description": "ElasticSearch & Kibana",
+            "tags": "instant-app"
+        }
+    },
+    "objects": [
+        {
+            "apiVersion": "v1",
+            "kind": "DeploymentConfig",
+            "metadata": {
+                "name": "cloud-log-elastic-kibana"
+            },
+            "spec": {
+                "replicas": 4,
+                "selector": {
+                    "deploymentconfig": "cloud-log-elastic-kibana"
+                },
+                "strategy": {
+                    "type": "Recreate"
+                },
+                "template": {
+                    "metadata": {
+                        "labels": {
+                            "deploymentconfig": "cloud-log-elastic-kibana"
+                        }
+                    },
+                    "spec": {
+                        "containers": [
+                            {                                
+                                "env": [],
+                                "image": "bags/elasticsearch",
+                                "imagePullPolicy": "Always",
+                                "name": "elasticsearch",
+                                "ports": [
+                                    {
+                                        "containerPort": 9200,
+                                        "protocol": "TCP"
+                                    },
+                                    {
+                                        "containerPort": 9300,
+                                        "protocol": "TCP"
+                                    }                                    
+                                ],
+                                "resources": {},
+                                "securityContext": {
+                                    "capabilities": {},
+                                    "privileged": false
+                                },
+                                "terminationMessagePath": "/dev/termination-log"
+                            },
+                            {
+                                "env": [
+                                    {
+                                        "name": "ELASTICSEARCH_URL",
+                                        "value": "http://localhost:9200"
+                                    }
+                                ],
+                                "image": "kibana",
+                                "imagePullPolicy": "Always",
+                                "name": "kibana",
+                                "ports": [
+                                    {
+                                        "containerPort": 5601,
+                                        "protocol": "TCP"
+                                    }
+                                ],
+                                "resources": {},
+                                "securityContext": {
+                                    "capabilities": {},
+                                    "privileged": false
+                                },
+                                "terminationMessagePath": "/dev/termination-log"
+                            }
+                        ],
+                        "dnsPolicy": "ClusterFirst",
+                        "nodeSelector": {
+                            "infra": "logging"
+                        },
+                        "restartPolicy": "Always"
+                    }
+                }
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Route",
+            "metadata": {
+                "name": "cloud-log-elasticsearch"
+            },
+            "spec": {
+                "host": "cloud-log-elasticsearch",
+                "to": {
+                    "kind": "Service",
+                    "name": "cloud-log-elasticsearch"
+                }
+            }
+        },        
+        {
+            "apiVersion": "v1",
+            "kind": "Route",
+            "metadata": {
+                "name": "cloud-log-kibana"
+            },
+            "spec": {
+                "host": "cloud-log-kibana",
+                "tls": {
+                    "insecureEdgeTerminationPolicy": "Redirect",
+                    "termination": "edge"
+                },
+                "to": {
+                    "kind": "Service",
+                    "name": "cloud-log-kibana"
+                }
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "name": "cloud-log-elasticsearch"
+            },
+            "spec": {
+                "ports": [
+                    {
+                        "name": "cloud-log-elasticsearch",
+                        "port": 9200,
+                        "targetPort": 9200
+                    }
+                ],
+                "selector": {
+                    "deploymentconfig": "cloud-log-elastic-kibana"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "name": "cloud-log-kibana"
+            },
+            "spec": {
+                "ports": [
+                    {
+                        "name": "cloud-log-kibana",
+                        "port": 5601,
+                        "targetPort": 5601
+                    }
+                ],
+                "selector": {
+                    "deploymentconfig": "cloud-log-elastic-kibana"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "DeploymentConfig",
+            "metadata": {
+                "name": "cloud-logstash-logspout"
+            },
+            "spec": {
+                "replicas": 4,
+                "selector": {
+                    "deploymentconfig": "cloud-logstash-logspout"
+                },
+                "strategy": {
+                    "type": "Recreate"
+                },
+                "template": {
+                    "metadata": {
+                        "labels": {
+                            "deploymentconfig": "cloud-logstash-logspout"
+                        }
+                    },
+                    "spec": {
+                        "containers": [
+                            {   
+                                "command": [
+                                    "logstash",
+                                    "-f",
+                                    "/etc/logstash/conf.d/logstash.conf",
+                                    "--allow-env"
+                                ],                                                         
+                                "env": [
+                                    {
+                                        "name": "ELASTICSEARCH_HOST",
+                                        "value": "cloud-log-elasticsearch.cloud.cad.ao.dcn"
+                                    },
+                                    {
+                                        "name": "ELASTICSEARCH_PORT",
+                                        "value": "80"
+                                    }                                                                    	
+                                ],
+                                "image": "bags/logstash",
+                                "imagePullPolicy": "Always",
+                                "name": "logstash",
+                                "ports": [
+                                    {
+                                        "containerPort": 5000,
+                                        "protocol": "TCP"
+                                    },
+                                    {
+                                        "containerPort": 5000,
+                                        "protocol": "UDP"
+                                    }                                    
+                                ],
+                                "resources": {},
+                                "securityContext": {
+                                    "capabilities": {},
+                                    "privileged": false
+                                },
+                                "terminationMessagePath": "/dev/termination-log"
+                            },
+                            {   
+                                "command": [
+                                    "/bin/logspout",
+                                    "syslog://localhost:5000"
+                                ],                                                         
+                                "env": [],
+                                "image": "gliderlabs/logspout",
+                                "imagePullPolicy": "Always",
+                                "name": "logspout",
+                                "resources": {},
+                                "volumeMounts": [
+                                  {
+                                    "name":"docker-sock",
+                                    "mountPath":"/var/run/docker.sock"
+                                  }
+                                ],
+                                "securityContext": {
+                                    "capabilities": {},
+                                    "privileged": true
+                                },
+                                "terminationMessagePath": "/dev/termination-log"
+                            }                            
+                        ],
+                        "volumes": [
+                          {
+                            "name":"docker-sock",
+                            "hostPath": {
+                            	"path": "/var/run/docker.sock"
+                            }
+                          }
+                        ],
+                        "dnsPolicy": "ClusterFirst",
+                        "nodeSelector": {
+                            "infra": "logging"
+                        },
+                        "restartPolicy": "Always",
+      					"serviceAccountName": "cloud-logging",
+      					"serviceAccount": "cloud-logging"
+                    }
+                }
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "name": "cloud-log-logstash"
+            },
+            "spec": {
+                "ports": [
+                    {
+                        "name": "cloud-log-logstash-tcp",
+                        "port": 5000,
+                        "targetPort": 5000,
+                        "protocol": "TCP"
+                    },
+                    {
+                        "name": "cloud-log-logstash-udp",
+                        "port": 5000,
+                        "targetPort": 5000,
+                        "protocol": "UDP"
+                    }                    
+                ],
+                "selector": {
+                    "deploymentconfig": "cloud-logstash-logspout"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            }
+        }                               
+    ],
+    "labels": {
+        "application": "elasticsearch-kibana",
+        "createdBy": "template-elasticsearch-kibana"
+    }
+}

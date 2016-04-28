@@ -1,0 +1,6 @@
+network:
+  host: 0
+cluster:
+  name: cloud-log
+node:
+  name: ${HOSTNAME}
