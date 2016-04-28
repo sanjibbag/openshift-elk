@@ -193,7 +193,7 @@
                                 "env": [
                                     {
                                         "name": "ELASTICSEARCH_HOST",
-                                        "value": "cloud-log-elasticsearch.cloud.cad.ao.dcn"
+                                        "value": "cloud-log-elasticsearch"
                                     },
                                     {
                                         "name": "ELASTICSEARCH_PORT",
